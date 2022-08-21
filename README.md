@@ -309,7 +309,7 @@ namespace BBBankAPI.Controllers.V1
     [ApiController]
     [ApiVersion("1.0")]
     [Route("api/v{version:apiVersion}/[controller]")]
-    [Route("api/[controller]")] // for backward compatibility
+
     public class TransactionController : ControllerBase
 	{
 		// controller operations
@@ -325,7 +325,7 @@ namespace BBBankAPI.Controllers.V2
     [ApiController]
     [ApiVersion("2.0")]
     [Route("api/v{version:apiVersion}/[controller]")]
-    [Route("api/[controller]")] // for backward compatibility
+
     public class TransactionController : ControllerBase
 	{
 		// controller operations
