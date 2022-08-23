@@ -23,17 +23,15 @@ namespace BBBankAPI.Controllers.V2
         /// <returns>Returns last 12 months data</returns>
         [HttpGet]
         [Route("GetLast12MonthBalances")]
-        public async Task<JsonResult> GetLast12MonthBalances()
+        public async Task<ActionResult> GetLast12MonthBalances()
         {
             try
             {
-                var res = await _transactionService.GetLast12MonthBalances(null);
-
-                return new JsonResult(JsonSerializer.Serialize(res));
+                 return new OkObjectResult(await _transactionService.GetLast12MonthBalancesWithAverage(null));
             }
             catch (Exception ex)
             {
-                return new JsonResult(ex);
+                return new BadRequestObjectResult(ex);
             }
         }
 

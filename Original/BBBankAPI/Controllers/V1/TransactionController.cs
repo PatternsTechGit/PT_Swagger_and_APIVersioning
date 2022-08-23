@@ -26,7 +26,7 @@ namespace BBBankAPI.Controllers.V1
         {
             try
             {
-                return new OkObjectResult(await _transactionService.GetLast12MonthBalances(null));
+                  return new OkObjectResult(await _transactionService.GetLast12MonthBalances(null));
             }
             catch (Exception ex)
             {
