@@ -152,9 +152,9 @@ builder.Services.AddSwaggerGen(options =>
     });
 
 
-// using System.Reflection;
-  var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-  options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
+    // this code is required to add code comments in swagger.
+    options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory,
+    $"{Assembly.GetExecutingAssembly().GetName().Name}.xml"));
 
 });
 ``` 
@@ -254,14 +254,17 @@ Add The APIVersioning service to the **IServiceCollection** in `program.cs`. Thi
 ```cs
 builder.Services.AddApiVersioning(setup =>
 {
-    setup.DefaultApiVersion = new ApiVersion(1,0);
+    setup.DefaultApiVersion = new ApiVersion(1, 0);
     setup.AssumeDefaultVersionWhenUnspecified = true;
     setup.ReportApiVersions = true;
 });
-
 builder.Services.AddVersionedApiExplorer(setup =>
 {
+    // add the versioned api explorer, which also adds IApiVersionDescriptionProvider service
+    // note: the specified format code will format the version as "'v'major[.minor][-status]"
     setup.GroupNameFormat = "'v'VVV";
+    // note: this option is only necessary when versioning by url segment. the SubstitutionFormat
+    // can also be used to control the format of the API version in route templates
     setup.SubstituteApiVersionInUrl = true;
 });
 ```
@@ -272,59 +275,17 @@ The AssumeDefaultVersionWhenUnspecified lets the router fallback to the default 
 
  ### 5.2 Decorate API Controller
 
-First create two folders **V1** and **V2** and copy the existing controller **TransactionController** and put it in both folders then delete the existing controller. Change the namespaces of both Controller as.
-```
-namespace BBBankAPI.Controllers.V1
+Decorate the API Controller with the version numbers that it’d be called when a request is made for that specific version.
 
-namespace BBBankAPI.Controllers.V2
-```
+Now **TransactionController** would be decorated as below, this will enable transaction controller to work for version **v1** as well as for **v2**. if no version mentioned in URL segment then default version **v1** would be called.
 
-In *V2* folder, controller method **GetLast12MonthBalances()** we would return the json result instead of returning model.
-
-Modify **GetLast12MonthBalances()** as below .
 ```
-public async Task<JsonResult> GetLast12MonthBalances()
+namespace BBBankAPI.Controllers
 {
-    try
-    {
-        var res = await _transactionService.GetLast12MonthBalances(null);
-
-        return new JsonResult(JsonSerializer.Serialize(res));
-    }
-    catch (Exception ex)
-    {
-        return new JsonResult(ex);
-    }
-}
-
-```
-
-Decorate the API Controllers with the version numbers that it’d be called when a request is made for that specific version.
-
-Now **TransactionController** in *V1* folder would be decorated as
-
-```
-namespace BBBankAPI.Controllers.V1
-{
-    [ApiController]
     [ApiVersion("1.0")]
-    [Route("api/v{version:apiVersion}/[controller]")]
-
-    public class TransactionController : ControllerBase
-	{
-		// controller operations
-	}
-}
-```
-
-and **TransactionController** in *V2* folder would be decorated as with version **2.0**
-
-```
-namespace BBBankAPI.Controllers.V2
-{
-    [ApiController]
     [ApiVersion("2.0")]
     [Route("api/v{version:apiVersion}/[controller]")]
+    [Route("api/[controller]")]
 
     public class TransactionController : ControllerBase
 	{
@@ -332,42 +293,148 @@ namespace BBBankAPI.Controllers.V2
 	}
 }
 ```
+ ### 5.2 Get version information
+
+Now we would use api version in **TransactionService** and based on version we will calculate **average** for *TransactionController* action **GetLast12MonthBalances** for *v2* and will return **average** with value *-1* for *v1*
+
+Install following nuget packages using package manager console , make sure to select *Services* project in package manager console:
+
+```cs
+Install-Package Microsoft.AspNetCore.Http
+
+Install-Package Microsoft.AspNetCore.Routing
+```
+
+Now add The **IHttpContextAccessor** service to the **IServiceCollection** in `program.cs`. This will help to detect api version.
+
+```cs
+builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+```
+
+ ### 5.3 Version usage
+
+ Now we will get api version in **TransactionService** method **GetLast12MonthBalances**, for this dependency inject **IHttpContextAccessor** in *TransactionService* constructor.
+
+```cs
+public TransactionService(BBBankContext BBBankContext, IHttpContextAccessor httpContextAccessor)
+{
+    _bbBankContext = BBBankContext;
+    _httpContextAccessor = httpContextAccessor;
+}
+```
+
+Modify **LineGraphData** model in **Entities** project and add new **Average** property .
+
+```cs
+ public class LineGraphData
+{
+    public decimal TotalBalance { get; set; }
+    public ICollection<string> Labels { get; set; }
+    public ICollection<decimal> Figures { get; set; }
+    public LineGraphData()
+    {
+        Labels = new List<string>();
+        Figures = new List<decimal>();
+    }
+
+    public decimal Average { get; set; } = -1;
+}
+
+```
 
 
- ### 5.3 Map API version
+In **TransactionService** method **GetLast12MonthBalances** get api information and based on information add the **average** in response .Now method would be as below, this line *_httpContextAccessor.HttpContext.GetRouteData().Values;* would give us api version and based on version we are adding **average**
 
-Modify step 4.2 code as below .
+```cs
+        public async Task<LineGraphData> GetLast12MonthBalances(string? userId)
+        {
+            // Object to contain the line graph data
+            var lineGraphData = new LineGraphData();
+
+            // Object to contain the transactions data
+            var allTransactions = new List<Transaction>();
+            if (userId == null)
+            {
+                // if account id is NULL then fetch all transactions
+                allTransactions = _bbBankContext.Transactions.ToList();
+            }
+            else
+            {
+                // if account id is not NULL then fetch all transactions for specific account id
+                allTransactions = _bbBankContext.Transactions.Where(x => x.Account.User.Id == userId).ToList();
+            }
+            if (allTransactions.Count() > 0)
+            {
+                // Calculate the total balance till now
+                var totalBalance = allTransactions.Sum(x => x.TransactionAmount);
+                lineGraphData.TotalBalance = totalBalance;
+
+                decimal lastMonthTotal = 0;
+
+                // looping through last three months starting from the current
+                for (int i = 12; i > 0; i--)
+                {
+                    // Calculate the running total balance
+                    var runningTotal = allTransactions.Where(x => x.TransactionDate >= DateTime.Now.AddMonths(-i) &&
+                       x.TransactionDate < DateTime.Now.AddMonths(-i + 1)).Sum(y => y.TransactionAmount) + lastMonthTotal;
+
+                    // adding labels to line graph data for current month and year
+                    lineGraphData.Labels.Add(DateTime.Now.AddMonths(-i + 1).ToString("MMM yyyy"));
+
+                    // adding data to line graph data for current month and year
+                    lineGraphData.Figures.Add(runningTotal);
+
+                    // saving the running total for this month
+                    lastMonthTotal = runningTotal;
+                }
+
+
+                var routeValues = _httpContextAccessor.HttpContext.GetRouteData().Values;
+                if (routeValues["version"] != null && routeValues["version"].ToString() == "2")
+                {
+                    lineGraphData.Average = Math.Round(lineGraphData.Figures.Sum() / lineGraphData.Figures.Count(),2);
+                }
+            }
+            // returning the line graph data object
+            return lineGraphData;
+        }
+```
+
+ ### 5.4 Map API version for swagger UI
+
+Modify step 4.2 code as below to get the api versions comments information for both versions in **swagger** UI .
 
 ```csharp
 builder.Services.AddSwaggerGen(options =>
 {
+
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Version = "v1",
         Title = "BBBank API",
-        Description = "An ASP.NET Core Web API for a fictitious bank application",
-
+        Description = "This is the first version of the API",
     });
-
     options.SwaggerDoc("v2", new OpenApiInfo
     {
         Version = "v2",
         Title = "BBBank API",
-        Description = "An ASP.NET Core Web API for a fictitious bank application",
+        Description = "This is the Second version with some extra properties returned.",
 
     });
-// using System.Reflection;
-  var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-  options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
+
+    // this code is required to add code comments in swagger.
+    options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory,
+    $"{Assembly.GetExecutingAssembly().GetName().Name}.xml"));
 
 });
 ``` 
 
-Now to map API version for swagger UI modify **UseSwaggerUI** added in step 2
+Now to build a swagger endpoint for each API version, modify **UseSwaggerUI** added in step 2,this will add both versions in swagger UI top right dropdown.
 
 ```cs
 app.UseSwaggerUI(c =>
 {
+    // build a swagger endpoint for each API version
     c.SwaggerEndpoint($"/swagger/v1/swagger.json", "BBBank API V1");
     c.SwaggerEndpoint($"/swagger/v2/swagger.json", "BBBank API V2");
 });
@@ -382,10 +449,10 @@ Now you should be able to see both versions in top right dropdown of swagger UI
 
 ![api-versions](/readme_assets/api-versions.png)
 
-Now access *V1* **TransactionController** method using swagger or api url http://localhost:5070/api/v1/Transaction/GetLast12MonthBalances
+Now access **TransactionController** action **GetLast12MonthBalances** for **v1** version using swagger or api url http://localhost:5070/api/v1/Transaction/GetLast12MonthBalances and you will notice **average** is added with *-1* mean no value calculated.
 
 ![v1-result](/readme_assets/v1-result.png)
 
-Now access *V2* **TransactionController** method using swagger or api url http://localhost:5070/api/v2/Transaction/GetLast12MonthBalances
+Now access **TransactionController** action **GetLast12MonthBalances** for **v2** version using swagger or api url http://localhost:5070/api/v2/Transaction/GetLast12MonthBalances and you will notice **average** is being calculated.
 
 ![v1-result](/readme_assets/v2-result.png)
