@@ -2,11 +2,13 @@
 using Microsoft.AspNetCore.Mvc;
 using Services.Contracts;
 
-namespace BBBankAPI.Controllers.V1
+namespace BBBankAPI.Controllers
 {
-    [ApiController]
     [ApiVersion("1.0")]
+    [ApiVersion("2.0")]
     [Route("api/v{version:apiVersion}/[controller]")]
+    [Route("api/[controller]")]
+    [ApiController]
     public class TransactionController : ControllerBase
     {
         private readonly ITransactionService _transactionService;
@@ -17,16 +19,21 @@ namespace BBBankAPI.Controllers.V1
 
 
         /// <summary>
-        /// Get the last 12 month balances
+        /// Api Version is automatically dependency Injected
+        /// This function returns Last 12 Months Balances
         /// </summary>
-        /// <returns>Returns last 12 months data</returns>
+        /// <param name="apiVersion"></param>
+        /// <returns>
+        /// Returns LineGraphData with Average in v2 and without Average in v1
+        /// </returns>
+        // [Authorize(Roles = "bank-manager")]
         [HttpGet]
         [Route("GetLast12MonthBalances")]
         public async Task<ActionResult> GetLast12MonthBalances()
         {
             try
             {
-                  return new OkObjectResult(await _transactionService.GetLast12MonthBalances(null));
+                return new OkObjectResult(await _transactionService.GetLast12MonthBalances(null));
             }
             catch (Exception ex)
             {

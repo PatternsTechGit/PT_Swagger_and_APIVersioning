@@ -16,5 +16,7 @@ namespace Entities.Responses
             Labels = new List<string>();
             Figures = new List<decimal>();
         }
+
+        public decimal Average { get; set; } = -1;
     }
 }
