@@ -293,7 +293,7 @@ namespace BBBankAPI.Controllers
 	}
 }
 ```
- ### 5.2 Get version information
+ ### 5.3 Get version information
 
 Now we would use api version in **TransactionService** and based on version we will calculate **average** for *TransactionController* action **GetLast12MonthBalances** for *v2* and will return **average** with value *-1* for *v1*
 
@@ -311,7 +311,7 @@ Now add The **IHttpContextAccessor** service to the **IServiceCollection** in `p
 builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
 ```
 
- ### 5.3 Version usage
+ ### 5.4 Version usage
 
  Now we will get api version in **TransactionService** method **GetLast12MonthBalances**, for this dependency inject **IHttpContextAccessor** in *TransactionService* constructor.
 
@@ -400,7 +400,7 @@ In **TransactionService** method **GetLast12MonthBalances** get api information 
         }
 ```
 
- ### 5.4 Map API version for swagger UI
+ ### 5.5 Map API version for swagger UI
 
 Modify step 4.2 code as below to get the api versions comments information for both versions in **swagger** UI .
 
