@@ -286,7 +286,7 @@ namespace BBBankAPI.Controllers
     [ApiVersion("2.0")]
     [Route("api/v{version:apiVersion}/[controller]")]
     [Route("api/[controller]")]
-
+    [ApiController]
     public class TransactionController : ControllerBase
 	{
 		// controller operations
@@ -316,6 +316,7 @@ builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
  Now we will get api version in **TransactionService** method **GetLast12MonthBalances**, for this dependency inject **IHttpContextAccessor** in *TransactionService* constructor.
 
 ```cs
+private readonly IHttpContextAccessor _httpContextAccessor;
 public TransactionService(BBBankContext BBBankContext, IHttpContextAccessor httpContextAccessor)
 {
     _bbBankContext = BBBankContext;
