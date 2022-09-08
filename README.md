@@ -63,13 +63,13 @@ Install-Package Swashbuckle.AspNetCore
 
  ## Step 2: Add and configure Swagger middleware
 
- Add the Swagger generator to the services collection in `Program.cs`.
+ Go tp `Program.cs` and add the Swagger generator to the services collection.
 
  ```csharp
 builder.Services.AddSwaggerGen();
 ```
 
-Enable the middleware for serving the generated JSON document and the Swagger UI, also in `Program.cs`.
+Also we will enable the middleware for serving the generated JSON document and the Swagger UI.
 
  ```csharp
 if (app.Environment.IsDevelopment())
